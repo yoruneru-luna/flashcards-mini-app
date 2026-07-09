@@ -1,4 +1,4 @@
-import { BookOpen, Home, LineChart, Plus, User } from "lucide-react";
+import { BookOpen, Home, LineChart, Pencil, Plus, Trash2, User } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { api } from "./api";
 import type { CardDto, CategorySummary, DeckSummary } from "./features/decks/types";
@@ -17,8 +17,13 @@ export function App() {
   const [categoryTitle, setCategoryTitle] = useState("");
   const [deckTitle, setDeckTitle] = useState("");
   const [selectedCategoryId, setSelectedCategoryId] = useState("");
+  const [deckEditTitle, setDeckEditTitle] = useState("");
+  const [deckEditCategoryId, setDeckEditCategoryId] = useState("");
   const [front, setFront] = useState("");
   const [back, setBack] = useState("");
+  const [editingCardId, setEditingCardId] = useState<string | null>(null);
+  const [editFront, setEditFront] = useState("");
+  const [editBack, setEditBack] = useState("");
   const [revealedCardId, setRevealedCardId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -32,6 +37,7 @@ export function App() {
     const nextDecks = await api<DeckSummary[]>("/decks");
     setDecks(nextDecks);
     if (!activeDeckId && nextDecks[0]) setActiveDeckId(nextDecks[0].id);
+    if (activeDeckId && !nextDecks.some((deck) => deck.id === activeDeckId)) setActiveDeckId(nextDecks[0]?.id ?? null);
   }
 
   async function loadCards(deckId: string) {
@@ -47,7 +53,13 @@ export function App() {
 
   useEffect(() => {
     if (activeDeckId) loadCards(activeDeckId).catch(() => setError("Не удалось загрузить карточки"));
+    if (!activeDeckId) setCards([]);
   }, [activeDeckId]);
+
+  useEffect(() => {
+    setDeckEditTitle(activeDeck?.title ?? "");
+    setDeckEditCategoryId(activeDeck?.categoryId ?? "");
+  }, [activeDeck]);
 
   async function createCategory(event: FormEvent) {
     event.preventDefault();
@@ -76,6 +88,28 @@ export function App() {
     await loadCategories();
   }
 
+  async function updateDeck(event: FormEvent) {
+    event.preventDefault();
+    if (!activeDeck || !deckEditTitle.trim()) return;
+
+    await api<DeckSummary>(`/decks/${activeDeck.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ title: deckEditTitle.trim(), categoryId: deckEditCategoryId || null })
+    });
+    await loadDecks();
+    await loadCategories();
+  }
+
+  async function deleteDeck() {
+    if (!activeDeck || !window.confirm(`Удалить набор "${activeDeck.title}" вместе с карточками?`)) return;
+
+    await api(`/decks/${activeDeck.id}`, { method: "DELETE" });
+    setRevealedCardId(null);
+    setEditingCardId(null);
+    await loadDecks();
+    await loadCategories();
+  }
+
   async function createCard(event: FormEvent) {
     event.preventDefault();
     if (!activeDeckId || !front.trim() || !back.trim()) return;
@@ -86,6 +120,33 @@ export function App() {
     });
     setFront("");
     setBack("");
+    await loadCards(activeDeckId);
+    await loadDecks();
+  }
+
+  function startCardEdit(card: CardDto) {
+    setEditingCardId(card.id);
+    setEditFront(card.front);
+    setEditBack(card.back);
+  }
+
+  async function updateCard(cardId: string) {
+    if (!activeDeckId || !editFront.trim() || !editBack.trim()) return;
+
+    await api<CardDto>(`/cards/${cardId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ front: editFront.trim(), back: editBack.trim() })
+    });
+    setEditingCardId(null);
+    await loadCards(activeDeckId);
+  }
+
+  async function deleteCard(card: CardDto) {
+    if (!activeDeckId || !window.confirm(`Удалить карточку "${card.front}"?`)) return;
+
+    await api(`/cards/${card.id}`, { method: "DELETE" });
+    setRevealedCardId(null);
+    setEditingCardId(null);
     await loadCards(activeDeckId);
     await loadDecks();
   }
@@ -164,10 +225,21 @@ export function App() {
 
             {activeDeck ? (
               <section className="stack">
-                <div>
-                  <h2>{activeDeck.title}</h2>
-                  <p className="section-note">{activeDeck.categoryTitle ?? "Без категории"}</p>
-                </div>
+                <form className="settings-panel" onSubmit={updateDeck}>
+                  <div>
+                    <h2>Настройки набора</h2>
+                    <p className="section-note">{activeDeck.cardsCount} карточек</p>
+                  </div>
+                  <input value={deckEditTitle} onChange={(event) => setDeckEditTitle(event.target.value)} placeholder="Название набора" />
+                  <select value={deckEditCategoryId} onChange={(event) => setDeckEditCategoryId(event.target.value)}>
+                    <option value="">Без категории</option>
+                    {categories.map((category) => <option key={category.id} value={category.id}>{category.title}</option>)}
+                  </select>
+                  <div className="action-row">
+                    <button className="secondary" type="submit">Сохранить</button>
+                    <button className="danger-button" type="button" onClick={deleteDeck}><Trash2 size={18} />Удалить</button>
+                  </div>
+                </form>
 
                 <form className="card-form" onSubmit={createCard}>
                   <textarea value={front} onChange={(event) => setFront(event.target.value)} placeholder="Сторона 1" />
@@ -181,15 +253,34 @@ export function App() {
                   ) : (
                     cards.map((card) => (
                       <article className="flashcard" key={card.id}>
-                        <p>{card.front}</p>
-                        {revealedCardId === card.id ? <strong>{card.back}</strong> : <button onClick={() => setRevealedCardId(card.id)}>Показать ответ</button>}
-                        {revealedCardId === card.id && (
-                          <div className="rating-row">
-                            <button onClick={() => review(card.id, "again")}>Не помню</button>
-                            <button onClick={() => review(card.id, "hard")}>Трудно</button>
-                            <button onClick={() => review(card.id, "good")}>Хорошо</button>
-                            <button onClick={() => review(card.id, "easy")}>Легко</button>
-                          </div>
+                        {editingCardId === card.id ? (
+                          <>
+                            <textarea value={editFront} onChange={(event) => setEditFront(event.target.value)} placeholder="Сторона 1" />
+                            <textarea value={editBack} onChange={(event) => setEditBack(event.target.value)} placeholder="Сторона 2" />
+                            <div className="action-row">
+                              <button className="secondary" type="button" onClick={() => updateCard(card.id)}>Сохранить</button>
+                              <button type="button" onClick={() => setEditingCardId(null)}>Отмена</button>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="card-heading">
+                              <p>{card.front}</p>
+                              <div className="icon-actions">
+                                <button aria-label="Редактировать карточку" onClick={() => startCardEdit(card)}><Pencil size={17} /></button>
+                                <button aria-label="Удалить карточку" onClick={() => deleteCard(card)}><Trash2 size={17} /></button>
+                              </div>
+                            </div>
+                            {revealedCardId === card.id ? <strong>{card.back}</strong> : <button onClick={() => setRevealedCardId(card.id)}>Показать ответ</button>}
+                            {revealedCardId === card.id && (
+                              <div className="rating-row">
+                                <button onClick={() => review(card.id, "again")}>Не помню</button>
+                                <button onClick={() => review(card.id, "hard")}>Трудно</button>
+                                <button onClick={() => review(card.id, "good")}>Хорошо</button>
+                                <button onClick={() => review(card.id, "easy")}>Легко</button>
+                              </div>
+                            )}
+                          </>
                         )}
                       </article>
                     ))

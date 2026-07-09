@@ -11,6 +11,8 @@ const deckInput = z.object({
   fsrsEnabled: z.boolean().default(false)
 });
 
+const deckUpdateInput = deckInput.partial();
+
 const cardInput = z.object({
   front: z.string().min(1).max(2000),
   back: z.string().min(1).max(2000),
@@ -20,6 +22,8 @@ const cardInput = z.object({
   imageUrl: z.string().url().optional().nullable(),
   tags: z.array(z.string().min(1).max(50)).default([])
 });
+
+const cardUpdateInput = cardInput.partial();
 
 const categoryInput = z.object({
   title: z.string().min(1).max(80)
@@ -85,6 +89,39 @@ export async function registerDeckRoutes(app: FastifyInstance) {
     return reply.code(201).send({ ...deck, categoryTitle: null, cardsCount: 0 });
   });
 
+  app.patch("/decks/:deckId", async (request) => {
+    const userId = await currentUserId(request.headers);
+    const params = z.object({ deckId: z.string() }).parse(request.params);
+    const input = deckUpdateInput.parse(request.body);
+
+    await prisma.deck.findFirstOrThrow({ where: { id: params.deckId, userId } });
+    if (input.categoryId) await prisma.category.findFirstOrThrow({ where: { id: input.categoryId, userId } });
+
+    const deck = await prisma.deck.update({
+      where: { id: params.deckId },
+      data: input,
+      include: { category: true, _count: { select: { cards: true } } }
+    });
+
+    return {
+      id: deck.id,
+      title: deck.title,
+      description: deck.description,
+      categoryId: deck.categoryId,
+      categoryTitle: deck.category?.title ?? null,
+      cardsCount: deck._count.cards,
+      fsrsEnabled: deck.fsrsEnabled
+    };
+  });
+
+  app.delete("/decks/:deckId", async (request) => {
+    const userId = await currentUserId(request.headers);
+    const params = z.object({ deckId: z.string() }).parse(request.params);
+    await prisma.deck.deleteMany({ where: { id: params.deckId, userId } });
+
+    return { ok: true };
+  });
+
   app.get("/decks/:deckId/cards", async (request) => {
     const userId = await currentUserId(request.headers);
     const params = z.object({ deckId: z.string() }).parse(request.params);
@@ -140,5 +177,53 @@ export async function registerDeckRoutes(app: FastifyInstance) {
       imageUrl: card.imageUrl,
       tags: card.tags.map((tag) => tag.title)
     });
+  });
+
+  app.patch("/cards/:cardId", async (request) => {
+    const userId = await currentUserId(request.headers);
+    const params = z.object({ cardId: z.string() }).parse(request.params);
+    const input = cardUpdateInput.parse(request.body);
+
+    await prisma.card.findFirstOrThrow({ where: { id: params.cardId, userId } });
+
+    const card = await prisma.$transaction(async (tx) => {
+      if (input.tags) {
+        await tx.cardTag.deleteMany({ where: { cardId: params.cardId } });
+      }
+
+      return tx.card.update({
+        where: { id: params.cardId },
+        data: {
+          front: input.front,
+          back: input.back,
+          example: input.example,
+          hint: input.hint,
+          transcription: input.transcription,
+          imageUrl: input.imageUrl,
+          tags: input.tags ? { create: input.tags.map((title) => ({ title })) } : undefined
+        },
+        include: { tags: true }
+      });
+    });
+
+    return {
+      id: card.id,
+      deckId: card.deckId,
+      front: card.front,
+      back: card.back,
+      example: card.example,
+      hint: card.hint,
+      transcription: card.transcription,
+      imageUrl: card.imageUrl,
+      tags: card.tags.map((tag) => tag.title)
+    };
+  });
+
+  app.delete("/cards/:cardId", async (request) => {
+    const userId = await currentUserId(request.headers);
+    const params = z.object({ cardId: z.string() }).parse(request.params);
+    await prisma.card.deleteMany({ where: { id: params.cardId, userId } });
+
+    return { ok: true };
   });
 }
