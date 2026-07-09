@@ -21,6 +21,10 @@ const cardInput = z.object({
   tags: z.array(z.string().min(1).max(50)).default([])
 });
 
+const categoryInput = z.object({
+  title: z.string().min(1).max(80)
+});
+
 async function currentUserId(headers: Record<string, unknown>) {
   const identity = readPlatformIdentity(headers);
   const account = await prisma.platformAccount.findUniqueOrThrow({
@@ -30,18 +34,43 @@ async function currentUserId(headers: Record<string, unknown>) {
 }
 
 export async function registerDeckRoutes(app: FastifyInstance) {
+  app.get("/categories", async (request) => {
+    const userId = await currentUserId(request.headers);
+    const categories = await prisma.category.findMany({
+      where: { userId },
+      orderBy: { title: "asc" },
+      include: { _count: { select: { decks: true } } }
+    });
+
+    return categories.map((category) => ({
+      id: category.id,
+      title: category.title,
+      decksCount: category._count.decks
+    }));
+  });
+
+  app.post("/categories", async (request, reply) => {
+    const userId = await currentUserId(request.headers);
+    const input = categoryInput.parse(request.body);
+    const category = await prisma.category.create({ data: { userId, title: input.title } });
+
+    return reply.code(201).send({ id: category.id, title: category.title, decksCount: 0 });
+  });
+
   app.get("/decks", async (request) => {
     const userId = await currentUserId(request.headers);
     const decks = await prisma.deck.findMany({
       where: { userId },
       orderBy: { updatedAt: "desc" },
-      include: { _count: { select: { cards: true } } }
+      include: { category: true, _count: { select: { cards: true } } }
     });
 
     return decks.map((deck) => ({
       id: deck.id,
       title: deck.title,
       description: deck.description,
+      categoryId: deck.categoryId,
+      categoryTitle: deck.category?.title ?? null,
       cardsCount: deck._count.cards,
       fsrsEnabled: deck.fsrsEnabled
     }));
@@ -50,8 +79,10 @@ export async function registerDeckRoutes(app: FastifyInstance) {
   app.post("/decks", async (request, reply) => {
     const userId = await currentUserId(request.headers);
     const input = deckInput.parse(request.body);
+    if (input.categoryId) await prisma.category.findFirstOrThrow({ where: { id: input.categoryId, userId } });
+
     const deck = await prisma.deck.create({ data: { ...input, userId } });
-    return reply.code(201).send({ ...deck, cardsCount: 0 });
+    return reply.code(201).send({ ...deck, categoryTitle: null, cardsCount: 0 });
   });
 
   app.get("/decks/:deckId/cards", async (request) => {
