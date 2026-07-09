@@ -1,0 +1,194 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Platform {
+  telegram
+  vk
+  dev
+}
+
+enum DeckLanguage {
+  none
+  english
+  spanish
+}
+
+enum ReviewMode {
+  basic
+  written
+  audio
+}
+
+enum ReviewRating {
+  again
+  hard
+  good
+  easy
+}
+
+model User {
+  id                String            @id @default(cuid())
+  email             String?           @unique
+  emailVerifiedAt   DateTime?
+  dailyNewCardsGoal Int               @default(20)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  platformAccounts  PlatformAccount[]
+  categories        Category[]
+  decks             Deck[]
+  cards             Card[]
+  reviewSessions    ReviewSession[]
+  reviewLogs        ReviewLog[]
+}
+
+model PlatformAccount {
+  id             String   @id @default(cuid())
+  userId         String
+  platform       Platform
+  platformUserId String
+  username       String?
+  firstName      String?
+  lastName       String?
+  rawProfile     Json?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([platform, platformUserId])
+  @@index([userId])
+}
+
+model EmailVerification {
+  id        String   @id @default(cuid())
+  email     String
+  codeHash  String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([email])
+}
+
+model Category {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  decks     Deck[]
+
+  @@unique([userId, title])
+  @@index([userId])
+}
+
+model Deck {
+  id            String       @id @default(cuid())
+  userId        String
+  categoryId    String?
+  title         String
+  description   String?
+  language      DeckLanguage @default(none)
+  accent        String?
+  fsrsEnabled   Boolean      @default(false)
+  retentionGoal Float        @default(0.9)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category      Category?    @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  cards         Card[]
+
+  @@unique([userId, title])
+  @@index([userId])
+  @@index([categoryId])
+}
+
+model Card {
+  id            String      @id @default(cuid())
+  userId        String
+  deckId        String
+  front         String
+  back          String
+  example       String?
+  hint          String?
+  transcription String?
+  imageUrl      String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deck          Deck        @relation(fields: [deckId], references: [id], onDelete: Cascade)
+  tags          CardTag[]
+  fsrsState     FsrsState?
+  reviewLogs    ReviewLog[]
+
+  @@index([userId])
+  @@index([deckId])
+}
+
+model CardTag {
+  id        String   @id @default(cuid())
+  cardId    String
+  title     String
+  createdAt DateTime @default(now())
+  card      Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@unique([cardId, title])
+  @@index([title])
+}
+
+model FsrsState {
+  id            String    @id @default(cuid())
+  cardId        String    @unique
+  dueAt         DateTime?
+  stability     Float?
+  difficulty    Float?
+  elapsedDays   Int       @default(0)
+  scheduledDays Int       @default(0)
+  reps          Int       @default(0)
+  lapses        Int       @default(0)
+  state         String    @default("new")
+  lastReviewAt  DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  card          Card      @relation(fields: [cardId], references: [id], onDelete: Cascade)
+}
+
+model ReviewSession {
+  id           String      @id @default(cuid())
+  userId       String
+  deckId       String?
+  mode         ReviewMode
+  startedAt    DateTime    @default(now())
+  finishedAt   DateTime?
+  totalCards   Int         @default(0)
+  correctCards Int         @default(0)
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  logs         ReviewLog[]
+
+  @@index([userId])
+  @@index([deckId])
+}
+
+model ReviewLog {
+  id         String         @id @default(cuid())
+  userId     String
+  cardId     String
+  sessionId  String?
+  mode       ReviewMode
+  rating     ReviewRating
+  answer     String?
+  reviewedAt DateTime       @default(now())
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  card       Card           @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  session    ReviewSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([cardId])
+  @@index([sessionId])
+}

@@ -1,0 +1,16 @@
+{
+  "name": "flashcards-mini-app",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Mini App Карточки для Telegram и VK",
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "dev:web": "npm run dev -w @cards/web",
+    "dev:backend": "npm run dev -w @cards/backend",
+    "build": "npm run build -w @cards/shared && npm run build -w @cards/backend && npm run build -w @cards/web",
+    "typecheck": "npm run typecheck -w @cards/shared && npm run typecheck -w @cards/backend && npm run typecheck -w @cards/web",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev"
+  },
+  "devDependencies": { "@types/node": "^22.10.0", "prisma": "^6.2.1", "typescript": "^5.7.2" }
+}
