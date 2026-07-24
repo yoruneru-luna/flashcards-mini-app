@@ -25,6 +25,7 @@ h2 { margin: 0 0 12px; font-size: 20px; }
 .danger-button { background: #fee2e2; color: #991b1b; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-weight: 700; }
 .inline-form { display: grid; grid-template-columns: 1fr 48px; gap: 8px; }
 input, textarea, select { width: 100%; border: 1px solid #d8deea; border-radius: 8px; background: #fff; padding: 12px; }
+input[type="checkbox"] { width: 18px; height: 18px; padding: 0; }
 textarea { min-height: 86px; resize: vertical; }
 .inline-form button { display: grid; place-items: center; background: #2563eb; color: #fff; }
 .deck-create-form { display: grid; gap: 8px; }
@@ -38,6 +39,7 @@ textarea { min-height: 86px; resize: vertical; }
 .chip.active { background: #172033; color: #fff; border-color: #172033; }
 .card-form, .settings-panel { display: grid; gap: 10px; }
 .section-note { margin: -6px 0 0; color: #63708a; }
+.toggle-row { display: flex; align-items: center; gap: 10px; color: #36527d; }
 .flashcard { display: grid; gap: 12px; }
 .flashcard p { margin: 0; font-size: 18px; }
 .flashcard strong { font-size: 20px; }
@@ -61,7 +63,7 @@ textarea { min-height: 86px; resize: vertical; }
 @media (prefers-color-scheme: dark) {
   :root { color: #eef3ff; background: #101522; }
   .hero-panel, .deck-row, .flashcard, .notice, .stats-grid > div, input, textarea, select, .chip, .platform, .bottom-nav { background: #171e2f; border-color: #2a344a; color: #eef3ff; }
-  .empty, .muted, .deck-row small, .hero-panel p, .hero-panel span, .eyebrow, .section-note { color: #aab6cc; }
+  .empty, .muted, .deck-row small, .hero-panel p, .hero-panel span, .eyebrow, .section-note, .toggle-row { color: #aab6cc; }
   .chip.active { background: #eef3ff; color: #101522; }
   .secondary { background: #22365f; color: #dbe8ff; }
   .danger-button { background: #4a1f28; color: #ffd7d7; }

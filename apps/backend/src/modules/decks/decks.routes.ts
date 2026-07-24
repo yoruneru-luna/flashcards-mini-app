@@ -29,6 +29,34 @@ const categoryInput = z.object({
   title: z.string().min(1).max(80)
 });
 
+function serializeCard(card: {
+  id: string;
+  deckId: string;
+  front: string;
+  back: string;
+  example: string | null;
+  hint: string | null;
+  transcription: string | null;
+  imageUrl: string | null;
+  tags: { title: string }[];
+  fsrsState?: { dueAt: Date | null; reps: number; state: string } | null;
+}) {
+  return {
+    id: card.id,
+    deckId: card.deckId,
+    front: card.front,
+    back: card.back,
+    example: card.example,
+    hint: card.hint,
+    transcription: card.transcription,
+    imageUrl: card.imageUrl,
+    dueAt: card.fsrsState?.dueAt?.toISOString() ?? null,
+    reps: card.fsrsState?.reps ?? 0,
+    reviewState: card.fsrsState?.state ?? "new",
+    tags: card.tags.map((tag) => tag.title)
+  };
+}
+
 async function currentUserId(headers: Record<string, unknown>) {
   const identity = readPlatformIdentity(headers);
   const account = await prisma.platformAccount.findUniqueOrThrow({
@@ -128,20 +156,10 @@ export async function registerDeckRoutes(app: FastifyInstance) {
     const cards = await prisma.card.findMany({
       where: { userId, deckId: params.deckId },
       orderBy: { createdAt: "desc" },
-      include: { tags: true }
+      include: { tags: true, fsrsState: true }
     });
 
-    return cards.map((card) => ({
-      id: card.id,
-      deckId: card.deckId,
-      front: card.front,
-      back: card.back,
-      example: card.example,
-      hint: card.hint,
-      transcription: card.transcription,
-      imageUrl: card.imageUrl,
-      tags: card.tags.map((tag) => tag.title)
-    }));
+    return cards.map(serializeCard);
   });
 
   app.post("/decks/:deckId/cards", async (request, reply) => {
@@ -161,22 +179,13 @@ export async function registerDeckRoutes(app: FastifyInstance) {
         hint: input.hint,
         transcription: input.transcription,
         imageUrl: input.imageUrl,
+        fsrsState: { create: { dueAt: new Date() } },
         tags: { create: input.tags.map((title) => ({ title })) }
       },
-      include: { tags: true }
+      include: { tags: true, fsrsState: true }
     });
 
-    return reply.code(201).send({
-      id: card.id,
-      deckId: card.deckId,
-      front: card.front,
-      back: card.back,
-      example: card.example,
-      hint: card.hint,
-      transcription: card.transcription,
-      imageUrl: card.imageUrl,
-      tags: card.tags.map((tag) => tag.title)
-    });
+    return reply.code(201).send(serializeCard(card));
   });
 
   app.patch("/cards/:cardId", async (request) => {
@@ -206,17 +215,12 @@ export async function registerDeckRoutes(app: FastifyInstance) {
       });
     });
 
-    return {
-      id: card.id,
-      deckId: card.deckId,
-      front: card.front,
-      back: card.back,
-      example: card.example,
-      hint: card.hint,
-      transcription: card.transcription,
-      imageUrl: card.imageUrl,
-      tags: card.tags.map((tag) => tag.title)
-    };
+    const cardWithState = await prisma.card.findUniqueOrThrow({
+      where: { id: card.id },
+      include: { tags: true, fsrsState: true }
+    });
+
+    return serializeCard(cardWithState);
   });
 
   app.delete("/cards/:cardId", async (request) => {

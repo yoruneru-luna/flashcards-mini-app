@@ -19,5 +19,8 @@ export type CardDto = {
   deckId: string;
   front: string;
   back: string;
+  dueAt: string | null;
+  reps: number;
+  reviewState: string;
   tags: string[];
 };

@@ -26,6 +26,7 @@ export function App() {
   const [selectedCategoryId, setSelectedCategoryId] = useState("");
   const [deckEditTitle, setDeckEditTitle] = useState("");
   const [deckEditCategoryId, setDeckEditCategoryId] = useState("");
+  const [deckEditFsrsEnabled, setDeckEditFsrsEnabled] = useState(false);
   const [front, setFront] = useState("");
   const [back, setBack] = useState("");
   const [tags, setTags] = useState("");
@@ -37,6 +38,10 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
 
   const activeDeck = useMemo(() => decks.find((deck) => deck.id === activeDeckId), [activeDeckId, decks]);
+  const dueCardsCount = useMemo(() => {
+    const now = Date.now();
+    return cards.filter((card) => !card.dueAt || new Date(card.dueAt).getTime() <= now).length;
+  }, [cards]);
   const duplicateCard = useMemo(() => {
     const normalizedFront = front.trim().toLocaleLowerCase();
     const normalizedBack = back.trim().toLocaleLowerCase();
@@ -79,6 +84,7 @@ export function App() {
   useEffect(() => {
     setDeckEditTitle(activeDeck?.title ?? "");
     setDeckEditCategoryId(activeDeck?.categoryId ?? "");
+    setDeckEditFsrsEnabled(activeDeck?.fsrsEnabled ?? false);
   }, [activeDeck]);
 
   async function createCategory(event: FormEvent) {
@@ -114,7 +120,7 @@ export function App() {
 
     await api<DeckSummary>(`/decks/${activeDeck.id}`, {
       method: "PATCH",
-      body: JSON.stringify({ title: deckEditTitle.trim(), categoryId: deckEditCategoryId || null })
+      body: JSON.stringify({ title: deckEditTitle.trim(), categoryId: deckEditCategoryId || null, fsrsEnabled: deckEditFsrsEnabled })
     });
     await loadDecks();
     await loadCategories();
@@ -196,7 +202,7 @@ export function App() {
           <div className="stack">
             <div className="hero-panel">
               <p>Пора повторить</p>
-              <strong>{cards.length}</strong>
+              <strong>{dueCardsCount}</strong>
               <span>карточек в выбранном наборе</span>
               <button className="primary" onClick={() => setTab("decks")} disabled={!activeDeckId}>
                 Начать повторение
@@ -257,6 +263,10 @@ export function App() {
                     <option value="">Без категории</option>
                     {categories.map((category) => <option key={category.id} value={category.id}>{category.title}</option>)}
                   </select>
+                  <label className="toggle-row">
+                    <input type="checkbox" checked={deckEditFsrsEnabled} onChange={(event) => setDeckEditFsrsEnabled(event.target.checked)} />
+                    <span>FSRS-очередь включена</span>
+                  </label>
                   <div className="action-row">
                     <button className="secondary" type="submit">Сохранить</button>
                     <button className="danger-button" type="button" onClick={deleteDeck}><Trash2 size={18} />Удалить</button>
@@ -301,6 +311,9 @@ export function App() {
                                 {card.tags.map((tag) => <span className="mini-tag" key={tag}>{tag}</span>)}
                               </div>
                             )}
+                            <p className="section-note">
+                              {card.dueAt ? `Следующий повтор: ${new Date(card.dueAt).toLocaleString("ru-RU")}` : "Можно повторять сейчас"}
+                            </p>
                             {revealedCardId === card.id ? <strong>{card.back}</strong> : <button onClick={() => setRevealedCardId(card.id)}>Показать ответ</button>}
                             {revealedCardId === card.id && (
                               <div className="rating-row">
