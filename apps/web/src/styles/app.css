@@ -40,6 +40,9 @@ textarea { min-height: 86px; resize: vertical; }
 .card-form, .settings-panel { display: grid; gap: 10px; }
 .section-note { margin: -6px 0 0; color: #63708a; }
 .toggle-row { display: flex; align-items: center; gap: 10px; color: #36527d; }
+.mode-switch { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.mode-switch button { border: 1px solid #d8deea; border-radius: 8px; min-height: 42px; background: #fff; color: #63708a; }
+.mode-switch button.active { background: #172033; border-color: #172033; color: #fff; font-weight: 700; }
 .flashcard { display: grid; gap: 12px; }
 .flashcard p { margin: 0; font-size: 18px; }
 .flashcard strong { font-size: 20px; }
@@ -50,6 +53,8 @@ textarea { min-height: 86px; resize: vertical; }
 .action-row > button { flex: 1; }
 .tag-list { display: flex; flex-wrap: wrap; gap: 6px; }
 .mini-tag { border-radius: 999px; background: #eef2ff; color: #2449a8; font-size: 12px; padding: 4px 8px; }
+.written-review { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+.written-review button { white-space: nowrap; }
 .rating-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .rating-row button, .flashcard button { background: #edf2ff; color: #2449a8; }
 .stats-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
@@ -68,4 +73,6 @@ textarea { min-height: 86px; resize: vertical; }
   .secondary { background: #22365f; color: #dbe8ff; }
   .danger-button { background: #4a1f28; color: #ffd7d7; }
   .mini-tag { background: #22365f; color: #dbe8ff; }
+  .mode-switch button { background: #171e2f; border-color: #2a344a; color: #aab6cc; }
+  .mode-switch button.active { background: #eef3ff; border-color: #eef3ff; color: #101522; }
 }

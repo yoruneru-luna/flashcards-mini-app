@@ -14,6 +14,10 @@ function parseTags(value: string) {
     .filter(Boolean);
 }
 
+function normalizeAnswer(value: string) {
+  return value.trim().toLocaleLowerCase().replace(/\s+/g, " ");
+}
+
 export function App() {
   const [tab, setTab] = useState<Tab>("home");
   const [user, setUser] = useState<MiniAppUser | null>(null);
@@ -34,6 +38,8 @@ export function App() {
   const [editFront, setEditFront] = useState("");
   const [editBack, setEditBack] = useState("");
   const [editTags, setEditTags] = useState("");
+  const [reviewMode, setReviewMode] = useState<"basic" | "written">("basic");
+  const [writtenAnswers, setWrittenAnswers] = useState<Record<string, string>>({});
   const [revealedCardId, setRevealedCardId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -179,10 +185,21 @@ export function App() {
     await loadDecks();
   }
 
-  async function review(cardId: string, rating: "again" | "hard" | "good" | "easy") {
-    await api("/reviews", { method: "POST", body: JSON.stringify({ cardId, rating, mode: "basic" }) });
+  async function review(cardId: string, rating: "again" | "hard" | "good" | "easy", mode: "basic" | "written" = "basic", answer?: string) {
+    await api("/reviews", { method: "POST", body: JSON.stringify({ cardId, rating, mode, answer }) });
     setCards((current) => current.filter((card) => card.id !== cardId));
+    setWrittenAnswers((current) => {
+      const next = { ...current };
+      delete next[cardId];
+      return next;
+    });
     setRevealedCardId(null);
+  }
+
+  async function submitWrittenReview(card: CardDto) {
+    const answer = writtenAnswers[card.id] ?? "";
+    const rating = normalizeAnswer(answer) === normalizeAnswer(card.back) ? "good" : "again";
+    await review(card.id, rating, "written", answer);
   }
 
   return (
@@ -281,6 +298,11 @@ export function App() {
                   <button className="primary" type="submit">Добавить карточку</button>
                 </form>
 
+                <div className="mode-switch" aria-label="Режим повторения">
+                  <button className={reviewMode === "basic" ? "active" : ""} onClick={() => setReviewMode("basic")}>Обычный</button>
+                  <button className={reviewMode === "written" ? "active" : ""} onClick={() => setReviewMode("written")}>Письменный</button>
+                </div>
+
                 <div className="review-stack">
                   {cards.length === 0 ? (
                     <p className="empty">В этом наборе пока нет карточек.</p>
@@ -314,13 +336,26 @@ export function App() {
                             <p className="section-note">
                               {card.dueAt ? `Следующий повтор: ${new Date(card.dueAt).toLocaleString("ru-RU")}` : "Можно повторять сейчас"}
                             </p>
-                            {revealedCardId === card.id ? <strong>{card.back}</strong> : <button onClick={() => setRevealedCardId(card.id)}>Показать ответ</button>}
-                            {revealedCardId === card.id && (
-                              <div className="rating-row">
-                                <button onClick={() => review(card.id, "again")}>Не помню</button>
-                                <button onClick={() => review(card.id, "hard")}>Трудно</button>
-                                <button onClick={() => review(card.id, "good")}>Хорошо</button>
-                                <button onClick={() => review(card.id, "easy")}>Легко</button>
+                            {reviewMode === "basic" ? (
+                              <>
+                                {revealedCardId === card.id ? <strong>{card.back}</strong> : <button onClick={() => setRevealedCardId(card.id)}>Показать ответ</button>}
+                                {revealedCardId === card.id && (
+                                  <div className="rating-row">
+                                    <button onClick={() => review(card.id, "again")}>Не помню</button>
+                                    <button onClick={() => review(card.id, "hard")}>Трудно</button>
+                                    <button onClick={() => review(card.id, "good")}>Хорошо</button>
+                                    <button onClick={() => review(card.id, "easy")}>Легко</button>
+                                  </div>
+                                )}
+                              </>
+                            ) : (
+                              <div className="written-review">
+                                <input
+                                  value={writtenAnswers[card.id] ?? ""}
+                                  onChange={(event) => setWrittenAnswers((current) => ({ ...current, [card.id]: event.target.value }))}
+                                  placeholder="Введите ответ"
+                                />
+                                <button onClick={() => submitWrittenReview(card)}>Проверить</button>
                               </div>
                             )}
                           </>
