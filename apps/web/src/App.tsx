@@ -7,6 +7,13 @@ import "./styles/app.css";
 type MiniAppUser = { id: string; email: string | null; platform: "telegram" | "vk" | "dev" };
 type Tab = "home" | "decks" | "stats" | "profile";
 
+function parseTags(value: string) {
+  return value
+    .split(",")
+    .map((tag) => tag.trim())
+    .filter(Boolean);
+}
+
 export function App() {
   const [tab, setTab] = useState<Tab>("home");
   const [user, setUser] = useState<MiniAppUser | null>(null);
@@ -21,13 +28,26 @@ export function App() {
   const [deckEditCategoryId, setDeckEditCategoryId] = useState("");
   const [front, setFront] = useState("");
   const [back, setBack] = useState("");
+  const [tags, setTags] = useState("");
   const [editingCardId, setEditingCardId] = useState<string | null>(null);
   const [editFront, setEditFront] = useState("");
   const [editBack, setEditBack] = useState("");
+  const [editTags, setEditTags] = useState("");
   const [revealedCardId, setRevealedCardId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const activeDeck = useMemo(() => decks.find((deck) => deck.id === activeDeckId), [activeDeckId, decks]);
+  const duplicateCard = useMemo(() => {
+    const normalizedFront = front.trim().toLocaleLowerCase();
+    const normalizedBack = back.trim().toLocaleLowerCase();
+    if (!normalizedFront && !normalizedBack) return null;
+
+    return cards.find((card) => {
+      const sameFront = normalizedFront && card.front.trim().toLocaleLowerCase() === normalizedFront;
+      const sameBack = normalizedBack && card.back.trim().toLocaleLowerCase() === normalizedBack;
+      return sameFront || sameBack;
+    }) ?? null;
+  }, [back, cards, front]);
 
   async function loadCategories() {
     setCategories(await api<CategorySummary[]>("/categories"));
@@ -116,10 +136,11 @@ export function App() {
 
     await api<CardDto>(`/decks/${activeDeckId}/cards`, {
       method: "POST",
-      body: JSON.stringify({ front: front.trim(), back: back.trim(), tags: [] })
+      body: JSON.stringify({ front: front.trim(), back: back.trim(), tags: parseTags(tags) })
     });
     setFront("");
     setBack("");
+    setTags("");
     await loadCards(activeDeckId);
     await loadDecks();
   }
@@ -128,6 +149,7 @@ export function App() {
     setEditingCardId(card.id);
     setEditFront(card.front);
     setEditBack(card.back);
+    setEditTags(card.tags.join(", "));
   }
 
   async function updateCard(cardId: string) {
@@ -135,7 +157,7 @@ export function App() {
 
     await api<CardDto>(`/cards/${cardId}`, {
       method: "PATCH",
-      body: JSON.stringify({ front: editFront.trim(), back: editBack.trim() })
+      body: JSON.stringify({ front: editFront.trim(), back: editBack.trim(), tags: parseTags(editTags) })
     });
     setEditingCardId(null);
     await loadCards(activeDeckId);
@@ -244,6 +266,8 @@ export function App() {
                 <form className="card-form" onSubmit={createCard}>
                   <textarea value={front} onChange={(event) => setFront(event.target.value)} placeholder="Сторона 1" />
                   <textarea value={back} onChange={(event) => setBack(event.target.value)} placeholder="Сторона 2" />
+                  <input value={tags} onChange={(event) => setTags(event.target.value)} placeholder="Теги через запятую" />
+                  {duplicateCard && <div className="notice">Похожая карточка уже есть: {duplicateCard.front}</div>}
                   <button className="primary" type="submit">Добавить карточку</button>
                 </form>
 
@@ -257,6 +281,7 @@ export function App() {
                           <>
                             <textarea value={editFront} onChange={(event) => setEditFront(event.target.value)} placeholder="Сторона 1" />
                             <textarea value={editBack} onChange={(event) => setEditBack(event.target.value)} placeholder="Сторона 2" />
+                            <input value={editTags} onChange={(event) => setEditTags(event.target.value)} placeholder="Теги через запятую" />
                             <div className="action-row">
                               <button className="secondary" type="button" onClick={() => updateCard(card.id)}>Сохранить</button>
                               <button type="button" onClick={() => setEditingCardId(null)}>Отмена</button>
@@ -271,6 +296,11 @@ export function App() {
                                 <button aria-label="Удалить карточку" onClick={() => deleteCard(card)}><Trash2 size={17} /></button>
                               </div>
                             </div>
+                            {card.tags.length > 0 && (
+                              <div className="tag-list">
+                                {card.tags.map((tag) => <span className="mini-tag" key={tag}>{tag}</span>)}
+                              </div>
+                            )}
                             {revealedCardId === card.id ? <strong>{card.back}</strong> : <button onClick={() => setRevealedCardId(card.id)}>Показать ответ</button>}
                             {revealedCardId === card.id && (
                               <div className="rating-row">

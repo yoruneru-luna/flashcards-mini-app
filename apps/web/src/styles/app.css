@@ -46,6 +46,8 @@ textarea { min-height: 86px; resize: vertical; }
 .icon-actions { display: flex; gap: 6px; flex-shrink: 0; }
 .icon-actions button { min-height: 36px; width: 36px; padding: 0; display: grid; place-items: center; }
 .action-row > button { flex: 1; }
+.tag-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.mini-tag { border-radius: 999px; background: #eef2ff; color: #2449a8; font-size: 12px; padding: 4px 8px; }
 .rating-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .rating-row button, .flashcard button { background: #edf2ff; color: #2449a8; }
 .stats-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
@@ -63,4 +65,5 @@ textarea { min-height: 86px; resize: vertical; }
   .chip.active { background: #eef3ff; color: #101522; }
   .secondary { background: #22365f; color: #dbe8ff; }
   .danger-button { background: #4a1f28; color: #ffd7d7; }
+  .mini-tag { background: #22365f; color: #dbe8ff; }
 }
